@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><title>Essai ruines et petite grotte</title>
+<style>html,body{margin:0;overflow:hidden}canvas{display:block}</style></head>
+<body><script type="module">
+// Pièces de ruines et petite grotte (page d'essai, pas dans le jeu), posées en rangée sur un sol plat.
+// Paramètres : type=muret|colonnes|arche|tour|maison|avantPoste|grotte|tous (tous = les six pièces et la grotte),
+// graines=1,2,3 (une pièce par graine ; avec type=tous, une seule graine), vue=face|trois|loin|entree|dedans (devant et dans la grotte),
+// nu=1 (sans habillage : l'ancien aspect), nuit=1 (scène sombre), zoom=2 (plus près), charpente=1 (grotte étayée), pente=0.15 (sol en pente, pour voir les herbes suivre le sol).
+import * as THREE from 'three';
+import { creerAleatoire } from '../src/regles/aleatoire';
+import { Chantier, construireGrotte, tirerPiece, TYPES_PIECES } from '../src/monde/piecesRuines';
+import { creerModelesRuines } from '../src/scene/modelesRuines';
+import { afficherTexte, creerRendu, params } from './commun';
+
+const nuit = params.get('nuit') === '1';
+const { rendu, scene } = creerRendu(nuit ? 0x0b1220 : 0x9fc0dc);
+if (nuit) scene.traverse((o) => { if (o.isLight) o.intensity *= 0.12; });
+const pente = Number(params.get('pente') ?? '0');
+const sol = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), new THREE.MeshLambertMaterial({ color: 0x6f9a4e }));
+sol.rotation.x = -Math.PI / 2 + Math.atan(pente);
+scene.add(sol);
+
+const type = params.get('type') ?? 'tous';
+const graines = (params.get('graines') ?? '1').split(',').map(Number);
+const vue = params.get('vue') ?? 'trois';
+const modeles = creerModelesRuines();
+const pieces = type === 'tous' ? [...TYPES_PIECES, 'grotte'].map((t) => ({ t, g: graines[0] })) : graines.map((g) => ({ t: type, g }));
+const ECART = type === 'tous' ? 13 : type === 'grotte' ? 17 : 12;
+const lignes = [];
+let profondeurGrotte = 5;
+pieces.forEach((p, i) => {
+  const x0 = (i - (pieces.length - 1) / 2) * ECART;
+  const alea = creerAleatoire(p.g * 7919 + 13);
+  // (le sol penche vers +z : hauteur par rapport au centre de la pièce)
+  const hauteurSol = (x, z) => -z * pente;
+  const c = new Chantier(alea, hauteurSol);
+  if (p.t === 'grotte') {
+    const P = alea.entre(4.6, 6), w = alea.entre(1.6, 2.1), H = alea.entre(2.5, 3);
+    profondeurGrotte = P;
+    // Entrée tournée vers la caméra (+z) ; une « falaise » derrière
+    construireGrotte(c, { x: 0, y: 0, z: 2, lacet: Math.PI }, { profondeur: P, demiLargeur: w, hauteur: H, charpente: params.get('charpente') === '1' }, 3);
+    const falaise = new THREE.Mesh(new THREE.BoxGeometry(22, 14, 8), new THREE.MeshLambertMaterial({ color: 0x8f8a84 }));
+    falaise.position.set(x0, 7, 2 - P - 4);
+    scene.add(falaise);
+  } else {
+    tirerPiece(p.t, alea).construire(c, { x: 0, y: 0, z: 0, lacet: 0 });
+  }
+  const g = modeles.geometries(c.blocs, params.get('nu') === '1' ? undefined : hauteurSol);
+  let triangles = 0;
+  for (const [geo, mat] of [[g.solide, modeles.materiau], [g.lumineux, modeles.materiauLumineux]]) {
+    if (!geo) continue;
+    const m = new THREE.Mesh(geo, mat);
+    m.position.set(x0, 0, 0);
+    scene.add(m);
+    triangles += geo.attributes.position.count / 3;
+  }
+  lignes.push(`${p.t} (graine ${p.g}) : ${c.blocs.length} blocs, ${triangles} triangles, ${g.lumineux ? 2 : 1} maillages`);
+});
+
+const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.1, 500);
+const large = (pieces.length * ECART) / 2;
+if (vue === 'face') {
+  camera.position.set(0, 2.2, large * 1.15 + 6);
+  camera.lookAt(0, 2, 0);
+} else if (vue === 'loin') {
+  camera.position.set(10, 1.62, 60);
+  camera.lookAt(0, 2, 0);
+} else if (vue === 'entree') {
+  // À hauteur d'yeux, à quelques pas de l'entrée de la première grotte
+  camera.position.set((-(pieces.length - 1) / 2) * ECART + 2, 1.62, 10.5);
+  camera.lookAt((-(pieces.length - 1) / 2) * ECART, 1.7, 0);
+} else if (vue === 'dedans') {
+  camera.position.set(0, 1.62, 2.5);
+  camera.lookAt(0, 1.4, 2 - profondeurGrotte);
+} else {
+  camera.position.set(large * 0.55 + 5, 5, large * 0.95 + 7);
+  camera.lookAt(0, 1.5, 0);
+}
+// zoom=2 : caméra deux fois plus près du centre
+camera.position.multiplyScalar(1 / Number(params.get('zoom') ?? '1'));
+camera.position.y = Math.max(camera.position.y, 1.5);
+rendu.render(scene, camera);
+afficherTexte(`${lignes.join('\n')}\nimage : ${rendu.info.render.calls} appels`);
+</script></body></html>

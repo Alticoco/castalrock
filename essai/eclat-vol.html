@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><title>Essai vol de l'Éclat</title>
+<style>html,body{margin:0;overflow:hidden}canvas{display:block}</style></head>
+<body><script type="module">
+// Vol de l'Éclat du Cœur à la mort de Morvan (page d'essai) : plusieurs instants superposés, de la montée à l'arrivée.
+// Paramètres : t=1.2 (instant, en secondes, de la mort de Morvan).
+import * as THREE from 'three';
+import { creerEffetsCombat } from '../src/scene/effetsCombat';
+import { afficherTexte, creerRendu, params } from './commun';
+
+const { rendu, scene } = creerRendu(0x9fc0dc);
+const effets = creerEffetsCombat(scene, () => 0);
+const joueur = { x: 5, y: 0, z: 0 };
+const marque = (p, c, h) => { const m = new THREE.Mesh(new THREE.BoxGeometry(0.5, h, 0.5), new THREE.MeshLambertMaterial({ color: c })); m.position.set(p.x, h / 2, p.z); scene.add(m); };
+marque({ x: 0, z: 0 }, 0xaa3333, 1.8);
+marque(joueur, 0x3355aa, 1.8);
+effets.eclatVersJoueur(0, 1.2, 0, () => joueur);
+const t = Number(params.get('t') ?? '1.2');
+for (let s = 0; s < t; s += 1 / 60) effets.mettreAJour(1 / 60);
+const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.1, 100);
+camera.position.set(2.5, 3, 9);
+camera.lookAt(2.5, 1.8, 0);
+rendu.render(scene, camera);
+afficherTexte(`t = ${t} s`);
+</script></body></html>

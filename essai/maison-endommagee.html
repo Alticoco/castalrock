@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><title>Essai maison endommagée</title>
+<style>html,body{margin:0;overflow:hidden}canvas{display:block}</style></head>
+<body><script type="module">
+// Maison de chaume intacte (à gauche) et endommagée par l'attaque (à droite), page d'essai, pas dans le jeu.
+// En haut : de face ; en bas : de trois quarts. Les deux maisons sortent du vrai rendu du village (definirEndommages).
+// Paramètres : nuit=1 (fenêtres de la maison intacte allumées, aucune dans la maison détruite), niveau=1|2|3 (niveau du village),
+// vue=face|trois|arriere|dessus (une seule vue, plein écran), angle=35 (angle de la vue de trois quarts, en degrés ;
+// négatif : vue du côté gauche), seule=1 (la maison endommagée seule, de plus près).
+import * as THREE from 'three';
+import { creerRenduVillage } from '../src/scene/modelesVillage';
+import { afficherTexte, cout, creerRendu, params } from './commun';
+
+const nuit = params.get('nuit') === '1';
+const { rendu, scene } = creerRendu(nuit ? 0x0b1220 : 0x9fc0dc);
+if (nuit) scene.traverse((o) => { if (o.isLight) o.intensity *= 0.15; });
+const sol = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), new THREE.MeshLambertMaterial({ color: 0x6f9a4e }));
+sol.rotation.x = -Math.PI / 2;
+scene.add(sol);
+
+const niveau = Number(params.get('niveau') ?? '1');
+const seule = params.get('seule') === '1';
+const ECART = seule ? 0 : 5.2;
+// Deux rendus du village : l'un tout intact, l'autre avec la maison-2 endommagée ; on n'en garde que cette maison
+const lignes = [];
+const maisons = [];
+[false, true].forEach((endommagee, i) => {
+  if (seule && !endommagee) return;
+  const village = creerRenduVillage(scene, 0);
+  village.definirEndommages(new Set(endommagee ? ['maison-2'] : []));
+  village.definirNiveau(niveau);
+  village.mettreAJour(0.4, nuit ? 1 : 0);
+  const racine = scene.children.filter((o) => o.name === 'village')[seule ? 0 : i];
+  for (const enfant of [...racine.children]) if (enfant.name !== 'maison-2') racine.remove(enfant);
+  const maison = racine.children[0];
+  maison.position.set((i * 2 - 1) * ECART, 0, 0);
+  maison.rotation.y = 0;
+  maisons.push(maison);
+  const c = cout(maison);
+  const fenetres = maison.children.length > 1 ? 'fenêtres qui s’allument' : 'aucune fenêtre qui s’allume';
+  lignes.push(`${endommagee ? 'endommagée' : 'intacte   '} : ${c.maillages} maillages, ${c.triangles} triangles (${fenetres})`);
+});
+
+const angle = (Number(params.get('angle') ?? '35') * Math.PI) / 180;
+const recul = seule ? 13 : 20;
+const cameras = {
+  face: () => { const c = new THREE.PerspectiveCamera(32, 1, 0.1, 300); c.position.set(0, 3.2, recul); c.lookAt(0, 2.5, 0); return c; },
+  arriere: () => { const c = new THREE.PerspectiveCamera(32, 1, 0.1, 300); c.position.set(0, 3.2, -recul); c.lookAt(0, 2.5, 0); return c; },
+  dessus: () => { const c = new THREE.PerspectiveCamera(32, 1, 0.1, 300); c.position.set(0, recul * 1.1, 6); c.lookAt(0, 0, 0); return c; },
+  trois: () => { const c = new THREE.PerspectiveCamera(32, 1, 0.1, 300); c.position.set(0, 7.5, recul); c.lookAt(0, 2, 0); return c; },
+};
+const vue = params.get('vue');
+const vues = vue ? [vue] : ['face', 'trois'];
+rendu.setScissorTest(true);
+vues.forEach((nom, rang) => {
+  const h = innerHeight / vues.length;
+  const y = innerHeight - (rang + 1) * h;
+  rendu.setViewport(0, y, innerWidth, h);
+  rendu.setScissor(0, y, innerWidth, h);
+  // De trois quarts : chaque maison tourne sur place, pour rester côte à côte
+  for (const m of maisons) m.rotation.y = nom === 'trois' ? -angle : 0;
+  const camera = cameras[nom]();
+  camera.aspect = innerWidth / h;
+  camera.updateProjectionMatrix();
+  rendu.render(scene, camera);
+});
+lignes.push(`village de niveau ${niveau}${nuit ? ', nuit' : ''}`);
+afficherTexte(lignes.join('\n'));
+</script></body></html>

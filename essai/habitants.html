@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><title>Essai habitants</title>
+<style>html,body{margin:0;overflow:hidden}canvas{display:block}</style></head>
+<body><script type="module">
+// Habitants du village et marchand ambulant vus sous plusieurs angles (page d'essai, pas dans le jeu).
+// Paramètres : qui=gaspard|marthe|mathilde|bertil|hugo|aldric|marchand (un seul, sous tous les angles de `vues`)
+// ou qui=tous (tous côte à côte, sous le premier angle de `vues`), vues=0,90,180 (angles en degrés),
+// gros=1 (gros plan sur la tête), haut=2 (caméra relevée de 2 m : vue plongeante), regard=0.6 (tête tournée, radians).
+import * as THREE from 'three';
+import { creerModeleHabitant } from '../src/scene/modelesHabitants';
+import { creerModeleMarchand } from '../src/scene/modeleMarchand';
+import { afficherTexte, cout, creerRendu, params } from './commun';
+const { rendu, scene } = creerRendu();
+const NOMS = ['gaspard', 'marthe', 'mathilde', 'bertil', 'hugo', 'aldric', 'marchand'];
+const qui = params.get('qui') ?? 'tous';
+const vues = (params.get('vues') ?? '0,90,180,315').split(',').map(Number);
+const gros = params.get('gros') === '1';
+const regard = Number(params.get('regard') ?? '0');
+const liste = qui === 'tous' ? NOMS.map((nom) => [nom, vues[0]]) : vues.map((angle) => [qui, angle]);
+const ecart = gros ? 0.8 : 1.5;
+const lignes = [];
+const dejaMesures = new Set();
+liste.forEach(([nom, angle], i) => {
+  const x = (i - (liste.length - 1) / 2) * ecart;
+  const orientation = (angle * Math.PI) / 180;
+  let objet;
+  if (nom === 'marchand') {
+    const m = creerModeleMarchand();
+    m.mettreAJour(1 / 60, { x, y: 0, z: 0, orientation, regard });
+    // La charrette (2e enfant du modèle) n'est pas montrée : elle cacherait les voisins
+    m.objet.children[1].visible = false;
+    objet = m.objet;
+  } else {
+    const h = creerModeleHabitant(nom);
+    h.mettreAJour(1 / 60, { x, y: 0, z: 0, orientation, vitesse: 0, regard, activite: false });
+    objet = h.objet;
+  }
+  scene.add(objet);
+  if (!dejaMesures.has(nom)) {
+    dejaMesures.add(nom);
+    const c = cout(objet);
+    lignes.push(`${nom} : ${c.maillages} maillages, ${c.triangles} triangles`);
+  }
+});
+// Cadrage : toute la rangée tient dans la largeur ; en gros plan, la caméra vise les têtes
+const largeur = liste.length * ecart;
+const distance = 6;
+const hauteurVue = Math.max(largeur * (innerHeight / innerWidth), gros ? 0.9 : 2.5);
+const camera = new THREE.PerspectiveCamera((2 * Math.atan(hauteurVue / 2 / distance) * 180) / Math.PI, innerWidth / innerHeight, 0.1, 50);
+const cible = gros ? 1.5 : 1.05;
+camera.position.set(0, cible + Number(params.get('haut') ?? '0'), distance);
+camera.lookAt(0, cible, 0);
+rendu.render(scene, camera);
+lignes.push(`image : ${rendu.info.render.calls} appels de dessin, ${rendu.info.render.triangles} triangles`);
+afficherTexte(lignes.join('\n'));
+</script></body></html>

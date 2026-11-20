@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><title>Essai ennemis</title>
+<style>html,body{margin:0;overflow:hidden}canvas{display:block}</style></head>
+<body><script type="module">
+// Bandit et Morvan le Balafré vus sous plusieurs angles (page d'essai, pas dans le jeu).
+// Paramètres : qui=bandit|morvan (un seul, sous tous les angles de `vues`) ou qui=tous (les deux côte à côte,
+// sous chaque angle de `vues`), vues=0,90,180 (angles en degrés), gros=1 (gros plan sur le buste et la tête),
+// marche=1 (pose en marche), phase=poursuite|anticipation|attaque|recul|mort (phase de combat, « repos » par défaut),
+// temps=0.4 (secondes d'animation), flash=1 (éclair blanc du coup reçu : toutes les pièces doivent blanchir),
+// haut=2 (caméra relevée de 2 m), dist=9 (distance de la caméra), regard=1.2 (hauteur visée).
+import * as THREE from 'three';
+import { creerModeleEnnemi, creerMorvan } from '../src/scene/modelesEnnemis';
+import { afficherTexte, cout, creerRendu, params } from './commun';
+const { rendu, scene } = creerRendu();
+const qui = params.get('qui') ?? 'tous';
+const vues = (params.get('vues') ?? '0,90,180,315').split(',').map(Number);
+const gros = params.get('gros') === '1';
+const marche = params.get('marche') === '1';
+const phase = params.get('phase') ?? 'repos';
+const temps = Number(params.get('temps') ?? (marche ? '0.4' : '0.016'));
+const noms = qui === 'tous' ? ['bandit', 'morvan'] : [qui];
+const liste = vues.flatMap((angle) => noms.map((nom) => [nom, angle]));
+const ecart = 1.7;
+const lignes = [];
+const dejaMesures = new Set();
+liste.forEach(([nom, angle], i) => {
+  const m = nom === 'morvan' ? creerMorvan() : creerModeleEnnemi('bandit');
+  const pose = {
+    x: (i - (liste.length - 1) / 2) * ecart, y: 0, z: 0, orientation: (angle * Math.PI) / 180,
+    phase, tempsPhase: temps, saut: -1, anticipation: phase === 'anticipation' ? 1 : 0, enMouvement: marche,
+  };
+  for (let t = 0; t < temps; t += 1 / 60) m.mettreAJour(1 / 60, pose);
+  if (params.get('flash') === '1') { m.flash(); m.mettreAJour(0.001, pose); }
+  scene.add(m.objet);
+  if (!dejaMesures.has(nom)) {
+    dejaMesures.add(nom);
+    const c = cout(m.objet);
+    lignes.push(`${nom} : ${c.maillages} maillages, ${c.triangles} triangles`);
+  }
+});
+// Cadrage : toute la rangée tient dans la largeur ; en gros plan, la caméra vise le haut du corps
+const largeur = liste.length * ecart;
+const distance = Number(params.get('dist') ?? '9');
+const hauteurVue = Math.max(largeur * (innerHeight / innerWidth), gros ? 1.5 : 2.9);
+const camera = new THREE.PerspectiveCamera((2 * Math.atan(hauteurVue / 2 / distance) * 180) / Math.PI, innerWidth / innerHeight, 0.1, 80);
+const cible = Number(params.get('regard') ?? (gros ? 1.45 : 1.2));
+camera.position.set(0, cible + Number(params.get('haut') ?? '0'), distance);
+camera.lookAt(0, cible, 0);
+rendu.render(scene, camera);
+lignes.push(`image : ${rendu.info.render.calls} appels de dessin, ${rendu.info.render.triangles} triangles`);
+afficherTexte(lignes.join('\n'));
+</script></body></html>

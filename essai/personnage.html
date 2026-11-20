@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><title>Essai personnage</title>
+<style>html,body{margin:0;overflow:hidden}canvas{display:block}</style></head>
+<body><script type="module">
+// Personnage en 3e personne vu sous plusieurs angles (page d'essai, pas dans le jeu).
+// Paramètres : vues=0,90,180 (angles en degrés), gros=1 (gros plan sur la tête), armure=cuir, casque=cuir,
+// outil=epee, niveau=fer, bouclier=bois, marche=1 (pose en marche), vitesse=8, saut=1, frappe=0.5, temps=0.4 (secondes d'animation),
+// haut=2 (caméra relevée de 2 m : vue plongeante), modele=forgeron (le forgeron du village à la place du héros),
+// ombre=1 (mode « ombre seule » de la 1re personne : rien ne doit rester visible).
+// dist=20 (distance de la caméra en mètres), champ=8 (angle de vue en degrés), regard=1.5 (hauteur visée).
+import * as THREE from 'three';
+import { creerPersonnage } from '../src/scene/personnage';
+import { creerForgeron } from '../src/scene/modelesVillage';
+import { afficherTexte, cout, creerRendu, params } from './commun';
+const { rendu, scene } = creerRendu();
+const vues = (params.get('vues') ?? '0,90,180,315').split(',').map(Number);
+const gros = params.get('gros') === '1';
+const temps = Number(params.get('temps') ?? '0.016');
+const lignes = [];
+vues.forEach((angle, i) => {
+  if (params.get('modele') === 'forgeron') {
+    const f = creerForgeron();
+    f.animer(1 / 60, { x: 0, y: 0, z: 0, orientation: 0, vitesse: 0, activite: false, regard: 0 });
+    f.objet.position.x = (i - (vues.length - 1) / 2) * 1.3;
+    f.objet.rotation.y = (angle * Math.PI) / 180;
+    scene.add(f.objet);
+    return;
+  }
+  const p = creerPersonnage();
+  if (params.get('outil')) p.definirOutil(params.get('outil'), params.get('niveau') ?? 'base');
+  if (params.get('bouclier')) p.definirBouclier(params.get('bouclier'));
+  if (params.has('armure') && p.definirArmure) p.definirArmure(params.get('armure') || null);
+  if (params.has('casque') && p.definirCasque) p.definirCasque(params.get('casque') || null);
+  if (params.get('ombre') === '1') p.definirOmbreSeule(true);
+  // vitesse=8 (m/s : 5 marche, 8 course), saut=1 (en l'air, en montée ; saut=-1 : en chute), frappe=0.5 (avancement du coup)
+  const vitesse = Number(params.get('vitesse') ?? (params.get('marche') === '1' ? 3 : 0));
+  const saut = Number(params.get('saut') ?? '0');
+  const pose = { x: 0, y: 0, z: 0, orientation: 0, vitesse, auSol: saut === 0, nage: false, progressionFrappe: Number(params.get('frappe') ?? '-1') };
+  for (let t = 0; t < temps; t += 1 / 60) {
+    pose.y += (saut * 4) / 60;
+    p.mettreAJour(1 / 60, pose);
+  }
+  p.objet.position.y = 0;
+  p.objet.position.x = (i - (vues.length - 1) / 2) * 1.3;
+  p.objet.rotation.y = (angle * Math.PI) / 180;
+  scene.add(p.objet);
+  if (i === 0) { const c = cout(p.objet); lignes.push(`personnage : ${c.maillages} maillages, ${c.triangles} triangles`); }
+});
+const camera = new THREE.PerspectiveCamera(Number(params.get('champ') ?? (gros ? 18 : 30)), innerWidth / innerHeight, 0.1, 200);
+const regard = Number(params.get('regard') ?? (gros ? 1.5 : 0.95));
+camera.position.set(0, regard + 0.05 + Number(params.get('haut') ?? '0'), Number(params.get('dist') ?? (gros ? 6 : 5.2)));
+camera.lookAt(0, regard, 0);
+rendu.render(scene, camera);
+lignes.push(`image : ${rendu.info.render.calls} appels de dessin, ${rendu.info.render.triangles} triangles`);
+afficherTexte(lignes.join('\n'));
+</script></body></html>

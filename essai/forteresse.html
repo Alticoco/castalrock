@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><title>Essai forteresse de Castalrock</title>
+<style>html,body{margin:0;overflow:hidden}canvas{display:block}</style></head>
+<body><script type="module">
+// La forteresse de Castalrock (page d'essai, pas dans le jeu) sur un sol bosselé.
+// Paramètres : nu=1 (sans habillage : l'ancien aspect), acces=0.8 (lacet de l'accès), vue=trois|haut.
+import * as THREE from 'three';
+import { decrireAutel } from '../src/regles/lieux';
+import { creerModeleAutel } from '../src/scene/modelesLieux';
+import { afficherTexte, cout, creerRendu, params } from './commun';
+
+const { rendu, scene } = creerRendu(0x9fc0dc);
+const hauteur = (x, z) => 0.5 * Math.sin(x * 0.15) + 0.4 * Math.cos(z * 0.2) + 0.03 * x;
+const sol = new THREE.Mesh(new THREE.PlaneGeometry(300, 300, 120, 120).rotateX(-Math.PI / 2), new THREE.MeshLambertMaterial({ color: 0x6f9a4e }));
+const pos = sol.geometry.attributes.position;
+for (let i = 0; i < pos.count; i++) pos.setY(i, hauteur(pos.getX(i), pos.getZ(i)));
+sol.geometry.computeVertexNormals();
+scene.add(sol);
+const acces = Number(params.get('acces') ?? '0.8');
+const lieu = { x: 0, z: 0, y: hauteur(0, 0), acces };
+const plan = decrireAutel(lieu);
+const autel = creerModeleAutel(plan, params.get('nu') === '1' ? undefined : hauteur);
+scene.add(autel.objet);
+const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.1, 500);
+if (params.get('vue') === 'haut') { camera.position.set(0, 60, 14); camera.lookAt(0, 0, 0); }
+else { camera.position.set(Math.sin(acces) * 38, 14, Math.cos(acces) * 38); camera.lookAt(0, 3, 0); }
+rendu.render(scene, camera);
+const c = cout(autel.objet);
+afficherTexte(`forteresse : ${c.maillages} maillages, ${c.triangles} triangles`);
+</script></body></html>

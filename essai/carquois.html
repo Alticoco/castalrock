@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><title>Essai carquois</title>
+<style>html,body{margin:0;overflow:hidden}canvas{display:block}</style></head>
+<body><script type="module">
+// Carquois dans le dos, sur chaque armure (page d'essai, pas dans le jeu).
+// Mesure, pour chaque armure, l'écart entre le devant du carquois et le dos de l'armure : un rayon part de derrière
+// le personnage, à la hauteur de chaque sommet du carquois, et touche la première surface du corps ou de l'armure.
+// Écart négatif = le carquois rentre dans l'armure ; grand écart positif = il flotte.
+// Paramètres : vitesse=8 et temps=0.4 (pose en course), vues=180 (angles de vue en degrés, 180 = de dos).
+import * as THREE from 'three';
+import { creerPersonnage } from '../src/scene/personnage';
+import { afficherTexte, creerRendu, params } from './commun';
+const { rendu, scene } = creerRendu();
+const armures = [null, 'fibres', 'cuir', 'fourrure', 'mailles', 'plaques'];
+const angle = Number(params.get('vue') ?? '150');
+const vitesse = Number(params.get('vitesse') ?? '0');
+const temps = Number(params.get('temps') ?? '0.016');
+const lignes = [];
+
+function maillagesVisibles(objet) {
+  const liste = new Set();
+  objet.traverseVisible((o) => { if (o.isMesh) liste.add(o); });
+  return liste;
+}
+
+armures.forEach((armure, i) => {
+  const p = creerPersonnage();
+  p.definirArmure(armure);
+  const pose = { x: 0, y: 0, z: 0, orientation: 0, vitesse, auSol: true, nage: false, progressionFrappe: -1 };
+  for (let t = 0; t < temps; t += 1 / 60) p.mettreAJour(1 / 60, pose);
+  p.objet.position.set(0, 0, 0);
+  p.objet.rotation.y = 0;
+  const sans = maillagesVisibles(p.objet);
+  p.definirCarquois(true);
+  p.objet.updateMatrixWorld(true);
+  const tous = maillagesVisibles(p.objet);
+  const carquois = [...tous].filter((m) => !sans.has(m));
+  const corps = [...sans];
+  // Seulement l'étui du carquois (les flèches dépassent au-dessus, la sangle l'entoure) : le plus gros maillage
+  const etui = carquois.reduce((a, b) => (a.geometry.attributes.position.count >= b.geometry.attributes.position.count ? a : b));
+  const lanceur = new THREE.Raycaster();
+  let ecartMin = Infinity;
+  let ecartMax = -Infinity;
+  let ou = '';
+  const profil = new Map();
+  const pos = etui.geometry.attributes.position;
+  const v = new THREE.Vector3();
+  for (let k = 0; k < pos.count; k++) {
+    v.fromBufferAttribute(pos, k).applyMatrix4(etui.matrixWorld);
+    lanceur.set(new THREE.Vector3(v.x, v.y, -2), new THREE.Vector3(0, 0, 1));
+    const touche = lanceur.intersectObjects(corps, false)[0];
+    if (!touche || touche.point.z < -0.6) continue;
+    const ecart = touche.point.z - v.z;
+    if (ecart < ecartMin) { ecartMin = ecart; ou = `${v.x.toFixed(2)}, ${v.y.toFixed(2)}, ${v.z.toFixed(2)} sur ${touche.object.name || touche.object.geometry.type}`; }
+    ecartMax = Math.max(ecartMax, ecart);
+    const tranche = Math.round(v.y * 20) / 20;
+    profil.set(tranche, Math.min(profil.get(tranche) ?? Infinity, ecart));
+  }
+  lignes.push('   profil (hauteur : écart cm) ' + [...profil].sort((a, b) => a[0] - b[0]).map(([y, e]) => `${y.toFixed(2)}:${(e * 100).toFixed(0)}`).join('  '));
+  lignes.push(`${armure ?? 'sans armure'} : écart mini ${(ecartMin * 100).toFixed(1)} cm (négatif = dedans) en ${ou}`);
+  p.objet.position.x = (i - (armures.length - 1) / 2) * 1.1;
+  p.objet.rotation.y = (angle * Math.PI) / 180;
+  scene.add(p.objet);
+});
+const camera = new THREE.PerspectiveCamera(Number(params.get('champ') ?? '30'), innerWidth / innerHeight, 0.1, 200);
+camera.position.set(0, 1.45, 7.5);
+camera.lookAt(0, 1.2, 0);
+rendu.render(scene, camera);
+afficherTexte(lignes.join('\n'));
+</script></body></html>

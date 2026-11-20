@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><title>Essai livre de fin</title>
+<style>html,body{margin:0;overflow:hidden;height:100%;background:#0b1020}#decor{position:absolute;inset:0;background:linear-gradient(#0b1020 0 45%, #14221a 45% 100%)}#ui{position:absolute;inset:0}</style></head>
+<body><div id="decor"></div><div id="ui"></div><script type="module">
+// Livre de fin ouvert sur un fond sombre (page d'essai, pas dans le jeu).
+// Paramètres : jours=14 niveau=16. Une fois refermé, un message s'affiche et le livre se rouvre après un clic.
+import { installerTheme } from '../src/ui/theme';
+import { creerLivreFin } from '../src/ui/livreFin';
+import { pagesLivreFin } from '../src/regles/fin';
+
+const params = new URLSearchParams(location.search);
+const bilan = { jours: Number(params.get('jours') ?? 14), niveau: Number(params.get('niveau') ?? 16) };
+const ui = document.getElementById('ui');
+installerTheme(ui);
+const livre = creerLivreFin(ui, () => {
+  const m = document.createElement('div');
+  m.style.cssText = 'position:absolute;top:20px;left:20px;color:#fff;font:16px sans-serif;cursor:pointer';
+  m.textContent = 'Livre refermé (surFermeture appelé). Cliquer pour le rouvrir.';
+  m.onclick = () => { m.remove(); livre.ouvrir(pagesLivreFin(bilan)); };
+  ui.appendChild(m);
+});
+livre.ouvrir(pagesLivreFin(bilan));
+</script></body></html>

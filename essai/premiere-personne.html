@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><title>Essai 1re personne</title>
+<style>html,body{margin:0;overflow:hidden}canvas{display:block}
+#viseur{position:fixed;left:50%;top:50%;width:6px;height:6px;margin:-3px;border-radius:50%;background:#fff;box-shadow:0 0 0 1px #000}</style></head>
+<body><div id="viseur"></div><script type="module">
+// Bras en 1re personne avec la caméra du jeu (même champ de vision), viseur au centre (page d'essai, pas dans le jeu).
+// Paramètres : outil=epee, niveau=fer, bouclier=bois, armure=cuir, arc=1 (arc en main), vise=1, tension=1,
+// fleche=0 (sans flèche), temps=1.5 (secondes d'animation avant la capture), marche=1,
+// frappe=0.5 (avancement de la frappe, 0 à 1), garde=1 (bouclier levé), charge=1 (coup chargé),
+// sort=boule-de-feu | soin | barriere (lancé `tempsSort` secondes avant la capture, 0.3 par défaut),
+// escalade=1 (les deux mains sur la paroi), phase=1.5 (avancement du geste d'escalade),
+// apresEscalade=1 (une seconde d'escalade puis retour à l'outil : les mains reprennent-elles leur forme ?).
+import * as THREE from 'three';
+import { CONFIG } from '../src/config';
+import { creerBrasPremierePersonne } from '../src/scene/personnage';
+import { afficherTexte, cout, creerRendu, params } from './commun';
+const { rendu, scene } = creerRendu(0x8fb0c8);
+const sol = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), new THREE.MeshStandardMaterial({ color: 0x7d9a55 }));
+sol.rotation.x = -Math.PI / 2;
+sol.position.y = -1.6;
+scene.add(sol);
+// Cible lointaine dans l'axe de la caméra : sert à juger l'alignement de l'arc
+const cible = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.6, 0.1, 24), new THREE.MeshStandardMaterial({ color: 0xc94b3b }));
+cible.rotation.x = Math.PI / 2;
+cible.position.set(0, 0, -25);
+scene.add(cible);
+// Paroi de roche à facettes devant la caméra (mur=1, ou d'office avec escalade=1 ; mur=0 pour l'enlever) :
+// sert à juger les mains d'escalade. `distanceMur` : distance de la paroi, en mètres (0.6 par défaut).
+if (params.get('mur') === '1' || (params.get('escalade') === '1' && params.get('mur') !== '0')) {
+  const geo = new THREE.PlaneGeometry(6, 5, 26, 22);
+  const pos = geo.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    // Relief faible et fixe (pas d'aléatoire) : des bosses de quelques centimètres vers l'arrière
+    const x = pos.getX(i);
+    const y = pos.getY(i);
+    pos.setZ(i, -0.035 * (1 + Math.sin(x * 7.3 + y * 3.1) * Math.cos(y * 5.7 - x * 2.2)));
+  }
+  const mur = new THREE.Mesh(geo.toNonIndexed(), new THREE.MeshStandardMaterial({ color: 0xa9a6ae, flatShading: true, roughness: 1 }));
+  mur.geometry.computeVertexNormals();
+  mur.position.z = -Number(params.get('distanceMur') ?? '0.6');
+  scene.add(mur);
+}
+const camera = new THREE.PerspectiveCamera(CONFIG.champDeVision, innerWidth / innerHeight, 0.05, 300);
+scene.add(camera);
+const bras = creerBrasPremierePersonne();
+camera.add(bras.objet);
+const arc = params.get('arc') === '1';
+if (arc) bras.definirOutil('arc');
+else if (params.get('outil')) bras.definirOutil(params.get('outil'), params.get('niveau') ?? 'base');
+if (params.get('bouclier')) bras.definirBouclier(params.get('bouclier'));
+if (params.has('armure') && bras.definirArmure) bras.definirArmure(params.get('armure') || null);
+const temps = Number(params.get('temps') ?? '1.5');
+if (params.get('garde') === '1') bras.definirGarde(true);
+if (params.has('charge')) bras.definirCharge(Number(params.get('charge')));
+if (params.get('escalade') === '1') bras.definirEscalade(true, Number(params.get('phase') ?? '0'));
+const frappe = params.has('frappe') ? Number(params.get('frappe')) : -1;
+const tempsSort = Number(params.get('tempsSort') ?? '0.3');
+let sortLance = !params.get('sort');
+const marche = params.get('marche') === '1';
+let phase = 0;
+if (params.get('apresEscalade') === '1') {
+  bras.definirEscalade(true, 1);
+  for (let t = 0; t < 1; t += 1 / 60) bras.mettreAJour(1 / 60, 0, 0, -1);
+  bras.definirEscalade(false, 1);
+}
+for (let t = 0; t < temps; t += 1 / 60) {
+  if (arc) bras.definirArc(Number(params.get('tension') ?? '0'), params.get('vise') === '1', params.get('fleche') !== '0');
+  phase += marche ? 0.15 : 0;
+  if (!sortLance && t >= temps - tempsSort) {
+    bras.jouerSort(params.get('sort'));
+    sortLance = true;
+  }
+  bras.mettreAJour(1 / 60, phase, marche ? 1 : 0, frappe);
+}
+rendu.render(scene, camera);
+const c = cout(bras.objet);
+afficherTexte(`bras : ${c.maillages} maillages, ${c.triangles} triangles\nimage : ${rendu.info.render.calls} appels, ${rendu.info.render.triangles} triangles`);
+</script></body></html>

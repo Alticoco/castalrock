@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><title>Essai Éclat du Cœur</title>
+<style>html,body{margin:0;overflow:hidden}canvas{display:block}</style></head>
+<body><script type="module">
+// L'Éclat du Cœur (page d'essai, pas dans le jeu) : à gauche couché au sol avec son halo, à droite seul (en main,
+// ou pour une cinématique), et un personnage pour l'échelle. Paramètres : angle=30 (rotation de l'éclat en degrés),
+// temps=0.7 (secondes de pulsation avant la capture), nuit=1 (scène sombre), loin=1 (vu à 25 m),
+// gros=1 (gros plan sur l'éclat seul), longueur=0.5 (mètres).
+import * as THREE from 'three';
+import { creerModeleEclat } from '../src/scene/modeleEclat';
+import { afficherTexte, cout, creerRendu, params } from './commun';
+const nuit = params.get('nuit') === '1';
+const { rendu, scene } = creerRendu(nuit ? 0x0b1220 : 0x9fc0dc);
+if (nuit) scene.traverse((o) => { if (o.isLight) o.intensity *= 0.12; });
+const sol = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), new THREE.MeshStandardMaterial({ color: 0x6f8f4e }));
+sol.rotation.x = -Math.PI / 2;
+scene.add(sol);
+// Repère d'échelle : une silhouette de 1,75 m
+const repere = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 1.75, 8), new THREE.MeshStandardMaterial({ color: 0x8a6a4a, flatShading: true }));
+repere.position.set(1.6, 0.875, -0.6);
+const longueur = Number(params.get('longueur') ?? '0.5');
+const angle = (Number(params.get('angle') ?? '0') * Math.PI) / 180;
+const gros = params.get('gros') === '1';
+const auSol = creerModeleEclat({ longueur, auSol: true });
+auSol.objet.rotation.y = angle;
+const seul = creerModeleEclat({ longueur });
+seul.objet.rotation.y = angle;
+if (gros) {
+  seul.objet.position.set(0, 1, 0);
+  scene.add(seul.objet);
+} else {
+  auSol.objet.position.set(-0.6, 0, 0);
+  seul.objet.position.set(0.6, 0.6, 0);
+  scene.add(auSol.objet, seul.objet, repere);
+}
+const temps = Number(params.get('temps') ?? '0.7');
+for (const m of [auSol, seul]) m.mettreAJour(temps);
+const camera = new THREE.PerspectiveCamera(40, innerWidth / innerHeight, 0.05, 300);
+if (gros) {
+  camera.position.set(0, 1.05, 1.1);
+  camera.lookAt(0, 1, 0);
+} else if (params.get('loin') === '1') {
+  camera.position.set(0, 1.62, 25);
+  camera.lookAt(0, 0.6, 0);
+} else {
+  camera.position.set(0.3, 1.3, 3.2);
+  camera.lookAt(0.2, 0.45, 0);
+}
+rendu.render(scene, camera);
+const a = cout(auSol.objet);
+const s = cout(seul.objet);
+afficherTexte(`éclat au sol : ${a.maillages} maillages, ${a.triangles} triangles\néclat seul : ${s.maillages} maillages, ${s.triangles} triangles\nimage : ${rendu.info.render.calls} appels`);
+</script></body></html>

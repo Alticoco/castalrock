@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><title>Essai écrans</title>
+<style>html,body{margin:0;overflow:hidden;height:100%}#ui{position:absolute;inset:0}
+#decor{position:absolute;inset:0}</style></head>
+<body><div id="decor"></div><div id="ui"></div><script type="module">
+// Écrans centrés (pause, quêtes, fabrication, marchand, dialogue, aide, chute) avec des données d'exemple,
+// sur un faux décor de jeu (page d'essai, pas dans le jeu). Paramètres : ecran=pause|annonces|village|journal|histoire|etabli|forge|feu|marchand|dialogue|dialogue-choix|aide|chute ;
+// fond=jour|nuit (défaut jour).
+import { installerTheme } from '../src/ui/theme';
+import { creerMenuPause } from '../src/ui/menuPause';
+import { creerEcranQuetes } from '../src/ui/ecranQuetes';
+import { creerEcranFabrication } from '../src/ui/ecranFabrication';
+import { creerEcranMarchand } from '../src/ui/ecranMarchand';
+import { creerEcranDialogue } from '../src/ui/dialogue';
+import { creerAide } from '../src/ui/aide';
+import { creerAideVue } from '../src/ui/aideVue';
+import { creerInvite } from '../src/ui/invite';
+import { creerCompteurImages } from '../src/ui/compteurImages';
+import { creerBarreChef } from '../src/ui/barreChef';
+import { creerInterfaceCombat } from '../src/ui/interfaceCombat';
+import { creerConteneur, ajouter } from '../src/regles/inventaire';
+import { creerEquipement } from '../src/regles/equipement';
+import { creerEtatQuetes, accepter } from '../src/regles/quetes';
+import { creerEtatHistoire } from '../src/regles/histoire';
+
+const params = new URLSearchParams(location.search);
+const ecran = params.get('ecran') ?? 'pause';
+const nuit = params.get('fond') === 'nuit';
+document.getElementById('decor').style.background = nuit
+  ? 'linear-gradient(#0b1020 0 45%, #14221a 45% 100%)'
+  : 'linear-gradient(#9fd2f0 0 45%, #8cc063 45% 70%, #6aa04a 70% 100%)';
+const ui = document.getElementById('ui');
+installerTheme(ui);
+creerAideVue(ui);
+
+let inv = creerConteneur(20);
+for (const [o, q] of [['bois', 24], ['pierre', 8], ['minerai-cuivre', 5], ['lingot-cuivre', 3], ['lingot-fer', 1]]) inv = ajouter(inv, o, q).conteneur;
+const coffre = creerConteneur(20);
+const equipement = creerEquipement();
+const etatFab = { inventaire: inv, coffre, equipement: { ...equipement, durabilite: { ...equipement.durabilite, hache: 40, armure: 20 } }, niveauVillage: 1, noeuds: [] };
+
+const rien = () => {};
+if (ecran === 'pause') {
+  const m = creerMenuPause(ui, {
+    reprendre: rien, sauvegarder: () => true, aide: rien, appliquerGraphismes: rien, appliquerVolumes: rien,
+    essayerBruitage: rien, coince: () => null, village: () => null, nouvellePartie: rien,
+  });
+  m.ouvrir();
+} else if (['annonces', 'village', 'journal', 'histoire'].includes(ecran)) {
+  const e = creerEcranQuetes(ui, rien, rien, rien, rien);
+  let etat = creerEtatQuetes();
+  const r1 = accepter(etat, 'nuisibles'); etat = r1.etat;
+  e.ouvrir(ecran === 'annonces' || ecran === 'village' ? 'panneau' : 'journal');
+  e.afficher({ etat: { enCours: etat.enCours, terminees: [] }, possession: { inventaire: inv, coffre }, niveauVillage: 1, noeuds: [], histoire: creerEtatHistoire() },
+    ecran === 'annonces' ? { texte: 'Quête acceptée', ok: true } : undefined);
+  if (ecran === 'village' || ecran === 'histoire') document.querySelector(`[data-onglet="${ecran}"]`).click();
+} else if (['etabli', 'forge', 'feu'].includes(ecran)) {
+  const e = creerEcranFabrication(ui, rien, rien, rien);
+  e.ouvrir(ecran, ecran === 'feu' ? rien : undefined);
+  e.afficher(etatFab, { texte: 'Pas assez de ressources', ok: false });
+} else if (ecran === 'marchand') {
+  const e = creerEcranMarchand(ui, rien, rien, rien);
+  e.ouvrir('Pour toi, mon ami, un prix d\'ami.');
+  e.afficher({ or: 42,
+    achats: [{ objet: 'potion-soin', nom: 'Potion de soin', prix: 12, stock: 3, abordable: true }, { objet: 'lingot-fer', nom: 'Lingot de fer', prix: 90, stock: 1, abordable: false }, { objet: 'kit-feu-camp', nom: 'Kit de feu de camp', prix: 20, stock: 0, abordable: true }],
+    ventes: [{ objet: 'bois', nom: 'bois', prix: 1, possede: 24 }, { objet: 'pierre', nom: 'pierre', prix: 2, possede: 0 }] }, { texte: 'Achat : Potion de soin', ok: true });
+} else if (ecran.startsWith('dialogue')) {
+  const d = creerEcranDialogue(ui, rien, rien);
+  const choix = ecran === 'dialogue-choix';
+  d.afficher({ nom: 'Marthe', texte: 'Bienvenue à l\'auberge, voyageur ! Il y a du pain frais et un lit chaud pour toi.', note: 'Quête : Une auberge accueillante — récompense 40 XP',
+    peutContinuer: !choix, options: choix ? [{ libelle: 'Je voudrais une chambre.' }, { libelle: 'Parle-moi du village.' }, { libelle: 'Au revoir.' }] : [] });
+} else if (ecran === 'aide') {
+  window.localStorage.removeItem('castalrock.aideVue');
+  const a = creerAide(ui);
+  a.afficher(true);
+} else if (ecran === 'petits') {
+  const i = creerInvite(ui);
+  i.afficher('E : ouvrir le coffre');
+  i.annoncer('Le forgeron vous salue');
+  const f = creerCompteurImages(ui);
+  f.definir(true);
+  f.image(1);
+  creerBarreChef(ui).afficher({ nom: 'Chef des bandits', ratio: 0.6 });
+} else if (ecran === 'chute') {
+  const c = creerInterfaceCombat(ui);
+  c.montrerChute(true);
+}
+window.setTimeout(() => { document.title = 'pret'; const m = document.createElement('div'); m.id = 'mesure'; m.textContent = ecran; document.body.appendChild(m); m.style.cssText = 'position:absolute;opacity:0;width:1px;height:1px;overflow:hidden'; }, 800);
+</script></body></html>

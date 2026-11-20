@@ -1,0 +1,12 @@
+node_modules/
+dist/
+*.log
+.vite/
+.claude/worktrees/
+
+# Captures des pages d'essai
+essai/captures/
+
+# Gardés en local, pas publiés : images de référence générées par IA et leurs consignes
+docs/concepts/
+docs/prompts-images.md

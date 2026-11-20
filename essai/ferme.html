@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><title>Essai ferme et cabane d'Aldric</title>
+<style>html,body{margin:0;overflow:hidden}canvas{display:block}</style></head>
+<body><script type="module">
+// Cabane d'Aldric, poules, moutons et enclos (page d'essai, pas dans le jeu).
+// En haut : la cabane de face et de trois quarts. En bas à gauche : trois poules (marche, picore, bat des ailes) et
+// trois moutons (marche, broute, au repos). En bas à droite : l'enclos avec deux moutons.
+// Paramètres : vue=cabane|animaux|enclos|dos (une seule vue, plein écran ; dos = la cabane vue de derrière),
+// nuit=1 (scène sombre : la lanterne et le bocal bleus luisent), temps=0.25 (secondes d'animation avant l'image),
+// angle=35 (angle de la cabane de trois quarts, en degrés), profil=1 (animaux vus de côté),
+// zoom=2 et decalage=-1 (vue des animaux : caméra plus près, déplacée de côté en mètres).
+import * as THREE from 'three';
+import { creerCabaneAldric, creerEnclos, creerMouton, creerPoule } from '../src/scene/modelesFerme';
+import { creerPersonnage } from '../src/scene/personnage';
+import { afficherTexte, cout, creerRendu, params } from './commun';
+
+const nuit = params.get('nuit') === '1';
+const { rendu, scene } = creerRendu(nuit ? 0x0b1220 : 0x9fc0dc);
+if (nuit) scene.traverse((o) => { if (o.isLight) o.intensity *= 0.15; });
+const sol = new THREE.Mesh(new THREE.PlaneGeometry(900, 900), new THREE.MeshLambertMaterial({ color: 0x6f9a4e }));
+sol.rotation.x = -Math.PI / 2;
+scene.add(sol);
+const temps = Number(params.get('temps') ?? '0.25');
+const lignes = [];
+const mesurer = (nom, objet) => { const c = cout(objet); lignes.push(`${nom} : ${c.maillages} maillages, ${c.triangles} triangles`); };
+/** Fait vivre un animal pendant `duree` secondes dans la pose donnée. */
+const jouer = (animal, pose, duree) => { for (let t = 0; t < duree; t += 1 / 60) animal.animer(1 / 60, pose); };
+
+// --- Cabane (autour de x = 0) : de face, de trois quarts, avec un personnage pour l'échelle ---
+const angle = (Number(params.get('angle') ?? '35') * Math.PI) / 180;
+const cabaneFace = creerCabaneAldric();
+cabaneFace.position.x = -3.2;
+const cabaneTrois = creerCabaneAldric();
+cabaneTrois.position.x = 3.2;
+cabaneTrois.rotation.y = -angle;
+scene.add(cabaneFace, cabaneTrois);
+mesurer('cabane d’Aldric', cabaneFace);
+const temoin = creerPersonnage();
+temoin.mettreAJour(1 / 60, { x: 0, y: 0, z: 0, orientation: 0, vitesse: 0, auSol: true, nage: false, progressionFrappe: -1 });
+temoin.objet.position.set(-0.6, 0, 1.6);
+scene.add(temoin.objet);
+
+// --- Animaux (autour de x = 100) ---
+const profil = params.get('profil') === '1';
+const poses = [
+  ['marche', { vitesse: 0.6, activite: false }],
+  ['activité', { vitesse: 0, activite: true }],
+  ['repos', { vitesse: 0, activite: false }],
+];
+poses.forEach(([, pose], i) => {
+  const poule = creerPoule(i);
+  jouer(poule, pose, temps);
+  if (i === 1) {
+    // La deuxième s'arrête au moment où son bec touche le sol
+    const tronc = poule.objet.getObjectByName('tronc');
+    for (let t = 0; t < 5 && tronc.rotation.x < 0.8; t += 1 / 60) poule.animer(1 / 60, pose);
+  }
+  if (i === 2) {
+    // La troisième attend son battement d'ailes (au plus 15 s), puis s'arrête en plein battement
+    const aile = poule.objet.getObjectByName('aile-g');
+    for (let t = 0; t < 15 && Math.abs(aile.rotation.z) < 0.9; t += 1 / 60) poule.animer(1 / 60, pose);
+  }
+  poule.objet.position.set(100 - 1.9 + i * 0.75, 0, 1.2);
+  const mouton = creerMouton(i === 2 ? 1 : 0);
+  jouer(mouton, pose, Math.max(temps, 1.5));
+  mouton.objet.position.set(100 - 0.2 + i * 1.25, 0, 0);
+  for (const a of [poule, mouton]) {
+    a.objet.rotation.y = profil ? Math.PI / 2 : 0.7;
+    scene.add(a.objet);
+  }
+  if (i === 0) { mesurer('poule', poule.objet); mesurer('mouton', mouton.objet); }
+});
+
+// --- Enclos (autour de x = 200), avec deux moutons dedans ---
+const enclos = creerEnclos();
+enclos.position.x = 200;
+scene.add(enclos);
+mesurer('enclos', enclos);
+[[-1.2, 0.6, 0.9, true], [1.3, -0.2, -2.2, false]].forEach(([x, z, orientation, broute], i) => {
+  const mouton = creerMouton(i);
+  jouer(mouton, { vitesse: 0, activite: broute }, 1.5);
+  mouton.objet.position.set(200 + x, 0, z);
+  mouton.objet.rotation.y = orientation;
+  scene.add(mouton.objet);
+});
+
+const camera = (x, y, z, cx, cy, cz, champ = 32) => {
+  const c = new THREE.PerspectiveCamera(champ, 1, 0.1, 400);
+  c.position.set(x, y, z);
+  c.lookAt(cx, cy, cz);
+  return c;
+};
+const vues = {
+  cabane: () => camera(decalage, 1.7 + 1.5 / zoom, 15 / zoom, decalage, 1.6, 0),
+  dos: () => camera(-3.2 - 6, 4, -9, -3.2, 1.5, 0),
+  animaux: () => camera(100.2 + decalage, 0.4 + 1.2 / zoom, 0.4 + 6.1 / zoom, 100.2 + decalage, 0.35, 0.4, 30),
+  enclos: () => camera(200 + 3 / zoom, 0.6 + 5.9 / zoom, 11 / zoom, 200, 0.3, 0),
+};
+const vue = params.get('vue');
+const zoom = Number(params.get('zoom') ?? '1');
+const decalage = Number(params.get('decalage') ?? '0');
+// Disposition par défaut : [vue, x, y, largeur, hauteur] en parts de l'écran (y compté depuis le bas)
+const cadres = vue ? [[vue, 0, 0, 1, 1]] : [['cabane', 0, 0.45, 1, 0.55], ['animaux', 0, 0, 0.5, 0.45], ['enclos', 0.5, 0, 0.5, 0.45]];
+rendu.setScissorTest(true);
+for (const [nom, x, y, l, h] of cadres) {
+  rendu.setViewport(x * innerWidth, y * innerHeight, l * innerWidth, h * innerHeight);
+  rendu.setScissor(x * innerWidth, y * innerHeight, l * innerWidth, h * innerHeight);
+  const c = vues[nom]();
+  c.aspect = (l * innerWidth) / (h * innerHeight);
+  c.updateProjectionMatrix();
+  rendu.render(scene, c);
+}
+afficherTexte(lignes.join('\n'));
+</script></body></html>

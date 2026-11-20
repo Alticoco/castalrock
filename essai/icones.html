@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><title>Essai icônes</title>
+<style>
+html,body{margin:0;background:#232a31;color:#F4ECDD;font-family:'Alegreya Sans',system-ui,sans-serif}
+#mesure{position:absolute;right:8px;top:6px;font:12px monospace;color:#D3C9B7}
+h2{font:600 14px Cinzel,Georgia,serif;color:#D9B871;margin:10px 14px 4px;letter-spacing:0.08em}
+.grille{display:flex;flex-wrap:wrap;gap:6px;padding:4px 12px}
+.carte{display:flex;flex-direction:column;align-items:center;gap:3px;width:var(--l)}
+.case{position:relative;box-sizing:border-box;display:flex;align-items:center;justify-content:center;background:rgba(12,15,20,0.55);border:1px solid rgba(214,182,110,0.33);border-radius:12px}
+.cle{font-size:10px;color:#D3C9B7;text-align:center;word-break:break-all;line-height:1.1}
+.barres{display:flex;flex-direction:column;gap:0}
+.barre{position:relative;height:118px}
+.decor{background:linear-gradient(#5d7a8c,#6f8a5a 70%,#4f6a3a)}
+</style></head>
+<body>
+<script type="module">
+// Toutes les icônes (src/ui/icones.ts) en grille, à 40 px et à 96 px, sur le fond ardoise de l'interface,
+// puis la vraie barre d'outils pour chaque palier (page d'essai, pas dans le jeu).
+// Paramètres : grand=0 (sans la grande grille ; grand=200 : grande grille à 200 px) ; filtre=epee,hache (seulement les clés qui contiennent un de ces mots).
+import { clesIcones, icone } from '../src/ui/icones';
+import { creerBarreOutils } from '../src/ui/barreOutils';
+import { installerTheme } from '../src/ui/theme';
+
+installerTheme(document.body);
+const params = new URLSearchParams(location.search);
+const filtres = (params.get('filtre') ?? '').split(',').filter(Boolean);
+const cles = clesIcones().filter((c) => filtres.length === 0 || filtres.some((f) => c.includes(f)));
+
+function grille(titre, taille, caseTaille) {
+  const h = document.createElement('h2');
+  h.textContent = titre;
+  const g = document.createElement('div');
+  g.className = 'grille';
+  for (const cle of cles) {
+    const carte = document.createElement('div');
+    carte.className = 'carte';
+    carte.style.setProperty('--l', `${caseTaille + 8}px`);
+    const c = document.createElement('div');
+    c.className = 'case';
+    c.style.cssText = `width:${caseTaille}px;height:${caseTaille}px`;
+    const d = document.createElement('div');
+    d.style.cssText = `width:${taille}px;height:${taille}px`;
+    d.innerHTML = icone(cle);
+    c.appendChild(d);
+    const n = document.createElement('div');
+    n.className = 'cle';
+    n.textContent = cle;
+    carte.append(c, n);
+    g.appendChild(carte);
+  }
+  document.body.append(h, g);
+}
+
+grille('Icônes à 40 px', 40, 56);
+const grand = Number(params.get('grand') ?? '96');
+if (grand > 0) grille(`Icônes à ${grand} px`, grand, grand + 14);
+
+// Vraie barre d'outils, un palier par ligne (l'épée tenue), sur un fond de décor
+if (params.get('barre') !== '0') {
+  const h = document.createElement('h2');
+  h.textContent = "Barre d'outils, du bois au cristal";
+  document.body.appendChild(h);
+  const barres = document.createElement('div');
+  barres.className = 'barres';
+  document.body.appendChild(barres);
+  const niveaux = ['base', 'cuivre', 'fer', 'acier', 'cristal'];
+  niveaux.forEach((niveau, i) => {
+    const racine = document.createElement('div');
+    racine.className = 'barre' + (i % 2 ? '' : ' decor');
+    barres.appendChild(racine);
+    const barre = creerBarreOutils(racine);
+    barre.afficher({
+      actif: ['epee', 'hache', 'pioche', 'arc', 'torche'][i],
+      pousses: 3,
+      pieges: 1,
+      arc: true,
+      fleches: 12,
+      niveaux: { epee: niveau, hache: niveau, pioche: niveau },
+      durabilites: { epee: 80, hache: 40, pioche: 15 },
+      durabilitesMax: { epee: 100, hache: 100, pioche: 100 },
+    });
+  });
+}
+
+const mesure = document.createElement('div');
+mesure.id = 'mesure';
+mesure.textContent = `${cles.length} icônes`;
+document.body.appendChild(mesure);
+</script></body></html>

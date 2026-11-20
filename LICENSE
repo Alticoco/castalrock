@@ -1,0 +1,30 @@
+Castalrock
+Copyright (c) 2026 Alticoco (https://github.com/Alticoco)
+
+Ce jeu (code, textes, modèles 3D écrits en code et documents de ce dépôt) est mis à disposition
+selon les termes de la licence Creative Commons Attribution - Pas d'utilisation commerciale -
+Partage dans les mêmes conditions 4.0 International (CC BY-NC-SA 4.0).
+
+Texte complet de la licence : https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode.fr
+Résumé : https://creativecommons.org/licenses/by-nc-sa/4.0/deed.fr
+
+En résumé, vous pouvez copier, modifier et partager ce jeu, à trois conditions :
+- Attribution : citer l'auteur (Alticoco) et donner un lien vers ce dépôt et vers la licence,
+  en indiquant si des modifications ont été faites.
+- Pas d'utilisation commerciale : aucune utilisation dans un but commercial (vente, revente,
+  version payante, publicité, service payant) sans l'accord écrit de l'auteur.
+- Partage dans les mêmes conditions : une version modifiée doit être publiée sous cette même
+  licence.
+
+Éléments tiers, qui gardent leur propre licence :
+- Sons (public/sons/) : CC0, sources dans public/sons/SOURCES.md.
+- Polices Cinzel et Alegreya Sans (public/polices/) : SIL Open Font License 1.1, textes dans
+  public/polices/.
+- Three.js, inclus dans la version construite du jeu : licence MIT, Copyright 2010-2026
+  Three.js Authors, texte dans public/licences/three.js-LICENSE.txt.
+
+----
+
+English: Castalrock (c) 2026 Alticoco is licensed under CC BY-NC-SA 4.0
+(https://creativecommons.org/licenses/by-nc-sa/4.0/). Third-party assets keep their own licences
+(sounds: CC0; fonts: SIL OFL 1.1; Three.js: MIT).

@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><title>Essai outils</title>
+<style>html,body{margin:0;overflow:hidden}canvas{display:block}</style></head>
+<body><script type="module">
+// Épées, haches et pioches des 5 paliers côte à côte (une rangée par outil), plus arc, torche et boucliers
+// (page d'essai, pas dans le jeu). Paramètres : outils=epee,hache,pioche ; angle=25 (rotation en degrés autour
+// de la verticale) ; gros=epee (une seule rangée, plus près) ; niveaux=fer,acier (seulement ces paliers) ;
+// zoom=2 (plus près) et haut=0.3 (vise plus haut, en mètres) pour un gros plan.
+import * as THREE from 'three';
+import { creerBouclier, creerMateriauxParNiveau, creerOutil } from '../src/scene/outils';
+import { afficherTexte, cout, creerRendu, params } from './commun';
+const { rendu, scene } = creerRendu();
+const niveaux = (params.get('niveaux') ?? 'base,cuivre,fer,acier,cristal').split(',');
+const mats = creerMateriauxParNiveau();
+const gros = params.get('gros');
+const types = gros ? [gros] : (params.get('outils') ?? 'epee,hache,pioche').split(',');
+const angle = (Number(params.get('angle') ?? '25') * Math.PI) / 180;
+const lignes = [];
+types.forEach((type, r) => {
+  niveaux.forEach((niveau, i) => {
+    const o = creerOutil(type, mats[niveau]);
+    o.position.set((i - (niveaux.length - 1) / 2) * 0.55, -r * 1.05, 0);
+    o.rotation.y = angle;
+    scene.add(o);
+    const c = cout(o);
+    lignes.push(`${type} ${niveau} : ${c.maillages} maillages, ${c.triangles} tri.`);
+  });
+});
+if (!gros) {
+  const extras = [creerOutil('arc', mats.base), creerOutil('torche', mats.base), creerBouclier('bois', mats.base), creerBouclier('renforce', mats.base)];
+  extras.forEach((o, i) => { o.position.set((i - 1.5) * 0.7, -types.length * 1.05, 0); o.rotation.y = angle; scene.add(o); });
+}
+const boite = new THREE.Box3().setFromObject(scene);
+const centre = boite.getCenter(new THREE.Vector3());
+const taille = boite.getSize(new THREE.Vector3());
+const camera = new THREE.PerspectiveCamera(30, innerWidth / innerHeight, 0.05, 100);
+const d = ((Math.max(taille.x / camera.aspect, taille.y) / (2 * Math.tan((15 * Math.PI) / 180))) * 1.1) / Number(params.get('zoom') ?? '1');
+centre.y += Number(params.get('haut') ?? '0');
+camera.position.set(centre.x, centre.y, centre.z + d + 0.5);
+camera.lookAt(centre);
+rendu.render(scene, camera);
+afficherTexte(lignes.join('\n'));
+</script></body></html>
